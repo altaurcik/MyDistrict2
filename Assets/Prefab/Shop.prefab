@@ -12,10 +12,11 @@ GameObject:
   - component: {fileID: 8991496382998246546}
   - component: {fileID: 460922884869574700}
   - component: {fileID: 5239958470970641046}
-  - component: {fileID: 8200861962650666847}
+  - component: {fileID: -761443845198332899}
+  - component: {fileID: 4465871597217006737}
   m_Layer: 0
   m_Name: Shop
-  m_TagString: Untagged
+  m_TagString: Shop
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
@@ -109,7 +110,23 @@ BoxCollider:
   serializedVersion: 3
   m_Size: {x: 1, y: 1, z: 1}
   m_Center: {x: 0, y: 0, z: 0}
---- !u!114 &8200861962650666847
+--- !u!208 &-761443845198332899
+NavMeshObstacle:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 69226163775433506}
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Shape: 1
+  m_Extents: {x: 0.5, y: 0.5, z: 0.5}
+  m_MoveThreshold: 0.1
+  m_Carve: 1
+  m_CarveOnlyStationary: 1
+  m_Center: {x: 0, y: 0, z: 0}
+  m_TimeToStationary: 0.5
+--- !u!114 &4465871597217006737
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -121,5 +138,4 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 789ebac10cdef4306b538c241ee7a1bb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  buildingType: 1
   maxQueueLength: 5

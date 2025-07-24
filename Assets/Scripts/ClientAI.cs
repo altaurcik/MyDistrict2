@@ -1,93 +1,162 @@
-// ClientAI.cs
 using UnityEngine;
+using System.Collections.Generic;
 using UnityEngine.AI;
+
+public enum ServiceState
+{
+    None,       // Клиент еще ничего не делает
+    Going, // Двигается к зданию
+    Waiting,    // Стоит в очереди
+    Served,     // Был обслужен (кликом игрока)
+    Leaving     // Двигается к выходу
+}
 
 public class ClientAI : MonoBehaviour
 {
-    public bool isSummoned = false;
-    public bool visitedAttraction = false;
-    public bool visitedShop = false;
-    public Transform targetBuilding;
-    public bool isWaitingInQueue = false;
-    public bool isServed = false;
-    public int happiness = 1;
-
+    public Transform entryPoint; // точка старта
+    public Transform exitPoint;  // точка выхода
+    public ServiceState serviceState = ServiceState.None; // Текущее состояние клиента
+    public bool isAttractionClient = false;        // Призван ли клиент аттракционом
+    private List<Building> targets = new List<Building>(); // Список целей
+    private int currentTargetIndex = 0; // Индекс текущей цели
     private NavMeshAgent agent;
-    public bool isAngry = false;
+    private float waitTimer = 0f; // Таймер ожидания в очереди
+    public float happiness = 0f; // Уровень счастья клиента
+    public float maxWaitTime = 5f; // Максимальное время ожидания в очереди
 
-    void Awake()
+    void Start()
     {
         agent = GetComponent<NavMeshAgent>();
-    }
-
-    public void MoveTo(Transform target)
-    {
-        if (agent == null)
-        {
-            Debug.LogError("NavMeshAgent не найден у клиента!");
-            return;
-        }
-
-        targetBuilding = target;
-        agent.SetDestination(target.position);
+        transform.position = entryPoint.position;
+        // Помещаем клиента в точку входа
+        SetTargetsList(); // Устанавливаем список целей
+        GoToNextTarget(); // Двигаемся к первой цели
     }
 
     void Update()
     {
+        //Debug.Log("Состояние клиента: " + serviceState);
 
-        if (isAngry || isWaitingInQueue || isServed)
+        if (serviceState == ServiceState.Going)
         {
-            float distanceToExit = Vector3.Distance(transform.position, GameManager.Instance.exitPoint.position);
-            Debug.Log($"[CLIENT] status: angry={isAngry}, served={isServed}, waiting={isWaitingInQueue}, distToExit={distanceToExit}");
-
-            if (distanceToExit < 1f)
+            // Если клиент движется к зданию, проверяем, достиг ли он цели
+            if (!agent.pathPending && agent.remainingDistance <= 1f)
             {
-                Debug.Log("[CLIENT] Destroyed due to close to exit.");
-                Destroy(gameObject);
+                Building building = targets[currentTargetIndex - 1]; // Получаем текущее здание из списка целей
+                bool enteredQueue = building.TryEnterQueue(this); // Пытаемся занять очередь в здании
+
+                if (enteredQueue)
+                {
+                    serviceState = ServiceState.Waiting; // Меняем состояние на "Waiting" 
+                    Debug.Log($"Клиент {gameObject.name} занял очередь в {building.gameObject.tag}");
+                    waitTimer = 0f; // Сбрасываем таймер ожидания
+
+                }
+                else
+                {
+                    // Если очередь полна, клиент злится и уходит
+                    ChangeHappiness(-1);
+                    Debug.Log($"Клиент {gameObject.name} не попал в очередь в {building.gameObject.tag} и уходит");
+                    building.RemoveFromQueue(this); // Удаляем клиента из очереди
+                    GoToNextTarget(); // Переходим к следующей цели
+                }
             }
-            return;
         }
 
-    // остальная логика
-
-
-        if (targetBuilding == null) return;
-
-        float distance = Vector3.Distance(transform.position, targetBuilding.position);
-        if (distance < 2f)
+        if (serviceState == ServiceState.Waiting)
         {
-            CheckQueueAtDistance();
+            // Если клиент в очереди, увеличиваем таймер ожидания
+            waitTimer += Time.deltaTime;
+
+            if (waitTimer >= maxWaitTime) // Если ждал больше 5 секунд
+            {
+                ChangeHappiness(-1); // Уменьшаем счастье
+                Debug.Log($"Клиент {gameObject.name} злится от долгого ожидания и уходит");
+                GoToNextTarget(); // Переходим к следующей цели
+            }
+
         }
-    }
 
-
-    public void CheckQueueAtDistance()
-    {
-        Building building = targetBuilding.GetComponent<Building>();
-        if (building == null) return;
-
-        if (building.GetQueueSize() >= building.maxQueueLength)
+        // Если клиент был обслужен (кликом игрока)
+        if (serviceState == ServiceState.Served)
         {
-            BecomeAngryAndLeave();
+            ChangeHappiness(1); // Увеличиваем счастье
+            Building building = targets[currentTargetIndex - 1]; // Получаем здание, в котором обслужили
+            building.RemoveFromQueue(this); // Удаляем клиента из очереди
+            Debug.Log($"Клиент {gameObject.name} был обслужен и уходит");
+            GoToNextTarget(); // Переходим к следующей цели     
         }
-        else
+
+        if (serviceState == ServiceState.Leaving)
         {
-            building.EnqueueClient(this);
-            isWaitingInQueue = true;
+            // Если клиент уходит, проверяем, достиг ли он точки выхода
+            if (!agent.pathPending && agent.remainingDistance <= 0.3f)
+            {
+                Debug.Log($"Клиент {gameObject.name} покидает парк");
+                Destroy(gameObject); // Удаляем клиента из игры
+            }
+        }
+
+    }
+
+    void SetTargetsList()
+    {
+        targets.Clear();
+        Building atraction = FindBuildingWithTag("Atraction");
+        Building shop = FindBuildingWithTag("Shop");
+        if (atraction != null && isAttractionClient)
+            targets.Add(atraction); // Добавляем аттракцион в список целей
+
+        if (shop != null)
+            targets.Add(shop); // Добавляем магазин в список целей
+
+        targets.Add(null); // последний пункт — выход
+
+        Debug.Log("Число целей: " + targets.Count);
+
+    }
+
+    Building FindBuildingWithTag(string tag)
+    {
+        GameObject[] objects = GameObject.FindGameObjectsWithTag(tag); // Находим все объекты с этим тэгом
+        Debug.Log($"Найдено {objects.Length} зданий с тэгом {tag}"); 
+
+        if (objects.Length == 0)
+            return null; // Нет зданий с таким тэгом
+
+        int idx = Random.Range(0, objects.Length); // Случайный индекс в массиве
+        return objects[idx].GetComponent<Building>(); // Возвращаем Building случайного объекта
+    }
+
+    public void GoToNextTarget()
+    {
+        if (currentTargetIndex < targets.Count)
+        {
+            Building target = targets[currentTargetIndex];
+
+            if (target != null)
+            {
+                // Двигаемся к зданию
+                serviceState = ServiceState.Going; // Присваиваем состояние "Двигается"
+                agent.SetDestination(target.transform.position);
+                currentTargetIndex++; // Переходим к следующей цели на следующий вызов
+                Debug.Log($"Цель {currentTargetIndex}: здание {target.gameObject.tag} — {target.transform.position}");
+            }
+            else
+            {
+                // Если цель null — это выход
+                agent.SetDestination(exitPoint.position);
+                serviceState = ServiceState.Leaving; // Присваиваем состояние "Уходит"
+                Debug.Log($"Цель {currentTargetIndex}: выход — {exitPoint.position}");
+            }
+
         }
     }
 
-    public void BecomeAngryAndLeave()
+    void ChangeHappiness(int value)
     {
-        happiness = 0;
-        isAngry = true;
-        GoToExit();
+        happiness += value; // Изменяем уровень счастья
     }
 
-    public void GoToExit()
-    {
-        GameManager.Instance.RegisterClientHappiness(happiness);
-        agent.SetDestination(GameManager.Instance.exitPoint.position);
-        Destroy(gameObject, 5f);
-    }
 }
+

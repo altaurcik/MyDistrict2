@@ -146,11 +146,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 5f96d889771c048a29993a03df39ad9a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  isSummoned: 0
-  visitedAttraction: 0
-  visitedShop: 0
-  targetBuilding: {fileID: 0}
-  isWaitingInQueue: 0
-  isServed: 0
-  happiness: 1
-  isAngry: 0
+  entryPoint: {fileID: 0}
+  exitPoint: {fileID: 0}
+  serviceState: 0
+  isAttractionClient: 0
+  happiness: 0
+  maxWaitTime: 5
